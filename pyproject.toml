@@ -1,0 +1,16 @@
+[tool.poetry]
+name = "snake"
+version = "0.1.0"
+description = ""
+authors = ["Daniel BIbby <daniel.bibby@faculty.ai>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.9"
+stable-baselines3 = "^2.4.0"
+torch = {version = "^2.5.1", extras = ["cpu"]}
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
