@@ -6,8 +6,8 @@ import matplotlib.pyplot as plt
 from matplotlib.colors import ListedColormap
 from IPython.display import display, clear_output
 
-from src.snake.environment.utils import transform_state, proximity_reward
-from src.snake.environment.reset_utils import (
+from .utils import transform_state, proximity_reward
+from .reset_utils import (
     create_random_coil_state,
     create_random_line_state,
 )
