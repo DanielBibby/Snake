@@ -7,9 +7,9 @@ from matplotlib.colors import ListedColormap
 from IPython.display import display, clear_output
 
 
-class SnakeEnv(gym.Env):
+class BaseSnakeEnv(gym.Env):
     def __init__(self):
-        super(SnakeEnv, self).__init__()
+        super(BaseSnakeEnv, self).__init__()
 
         self.action_space = Discrete(3)  # {0: 'Left', 1: 'Straight', 2: 'Right'}
 
@@ -85,16 +85,16 @@ class SnakeEnv(gym.Env):
         if not hasattr(self, "fig"):
             self.fig, self.ax = plt.subplots(figsize=(6, 6))
 
-        # Call the helper function to visualize the state
-        self.visualize_game_state(self.state)
+        # Call the helper function to visualise the state
+        self.visualise_game_state(self.state)
 
         if mode == "human":
             # Update the display in the notebook
             clear_output(wait=True)  # Clear previous output to keep it dynamic
             display(self.fig)  # Display the current figure in the notebook
-            plt.pause(0.01)  # Adjust for visualization speed
+            #plt.pause(0.01)  # Adjust for visualisation speed
 
-    def visualize_game_state(self, state):
+    def visualise_game_state(self, state):
         if len(state) != 100:
             raise ValueError("State list must have a length of 100.")
 
@@ -220,7 +220,7 @@ class SnakeEnv(gym.Env):
         return False
 
 
-class SnakeEnvNewStateRep(SnakeEnv):
+class SnakeEnvNewStateRep(BaseSnakeEnv):
     def __init__(self):
         super(SnakeEnvNewStateRep, self).__init__()
 
@@ -261,7 +261,7 @@ class SnakeEnvNewStateRep(SnakeEnv):
             return list(matrix.flatten())
 
 
-class SnakeEnvNewReward(SnakeEnv):
+class SnakeEnvNewReward(BaseSnakeEnv):
     def __init__(self):
         super(SnakeEnvNewReward, self).__init__()
 
@@ -309,7 +309,7 @@ class SnakeEnvNewReward(SnakeEnv):
         return self.state, reward, self.done, truncated, info
 
 
-class SnakeEnvRandS(SnakeEnv):
+class SnakeEnvRandS(BaseSnakeEnv):
     def __init__(self):
         super(SnakeEnvRandS, self).__init__()
 
@@ -402,7 +402,7 @@ class SnakeEnvRandS(SnakeEnv):
 
     def _get_valid_moves(self, x: int):
         if x < 0 or x > 99:
-            raise Exception(f"x shoudl be from 0 to 99, got {x}")
+            raise Exception(f"x should be from 0 to 99, got {x}")
 
         if x == 0:
             return [1, 10]
@@ -412,30 +412,29 @@ class SnakeEnvRandS(SnakeEnv):
             return [1, -10]
         elif x == 99:
             return [-1, -10]
-        elif np.floor(x / 10) == 0:
+        elif x // 10 == 0:  # Top row
             return [-1, 1, 10]
-        elif np.floor(x / 10) == 9:
+        elif x // 10 == 9:  # Bottom row
             return [-1, 1, -10]
-        elif x % 10 == 0:
+        elif x % 10 == 0:  # Left column
             return [1, 10, -10]
-        elif x % 10 == 9:
+        elif x % 10 == 9:  # Right column
             return [-1, 10, -10]
         else:
-            return [-1, 10, -10, 1]
+            return [-1, 1, 10, -10]
 
-    def _create_random_state(self):
-        """
-        returns a random valid state.
-
-        """
+    def _create_random_state(self, max_len: int = 10):
         state = [0] * 100
         state_lag = [0] * 100
 
+        # Initialize the snake with a random starting position
         snake = [np.random.choice(100)]
 
-        tail_length = np.random.choice(8) + 2
+        # Generate a random tail length (minimum 2, maximum 9)
+        tail_length = np.random.choice(max_len - 2) + 2
 
-        for i in range(tail_length):
+        # Build the snake
+        for _ in range(tail_length):
             done = False
             end = snake[-1]
             valid_moves = self._get_valid_moves(end)
@@ -449,18 +448,20 @@ class SnakeEnvRandS(SnakeEnv):
                         done = True
                     else:
                         valid_moves.pop(proposal_move)
-
                 except ValueError:
                     done = True
 
-        for i in snake[:-1]:
-            state[i] = 2
+        snake.reverse()
+        # Update state and state_lag with snake positions
+        for pos in snake[:-1]:
+            state[pos] = 2
         state[snake[-1]] = 3
 
-        for i in snake[:-2]:
-            state_lag[i] = 2
+        for pos in snake[:-2]:
+            state_lag[pos] = 2
         state_lag[snake[-2]] = 3
 
+        # Place food in a random location not occupied by the snake
         done = False
         while not done:
             proposal_food_loc = np.random.choice(100)
@@ -470,3 +471,62 @@ class SnakeEnvRandS(SnakeEnv):
                 state_lag[proposal_food_loc] = 1
 
         return state, state_lag, snake
+
+
+class SnakeEnvLineInit(SnakeEnvRandS):
+    def __init__(self):
+        super(SnakeEnvRandS, self).__init__()
+
+    def _create_random_state(self, max_len: int = 10):
+        state = [0] * 100
+        state_lag = [0] * 100
+
+        snake_length = np.random.choice(max_len - 1) + 2
+
+        if (snake_length >= 1) & (snake_length <= 10):
+            d = np.random.choice(4)  # 0: down, 1: up, 2: right, 3: left
+
+            done = False
+            while not done:
+                proposal = np.random.choice(100)
+
+                if (d == 0) & (np.floor(proposal / 10) <= 10 - snake_length):
+                    snake = [proposal + 10 * i for i in range(snake_length)]
+                    done = True
+
+                elif (d == 1) & (np.floor(proposal / 10) >= snake_length - 1):
+                    snake = [proposal - 10 * i for i in range(snake_length)]
+                    done = True
+
+                elif (d == 2) & (proposal % 10 <= 10 - snake_length):
+                    snake = [proposal + i for i in range(snake_length)]
+                    done = True
+
+                elif (d == 3) & (proposal % 10 >= snake_length - 1):
+                    snake = [proposal - i for i in range(snake_length)]
+                    done = True
+        else:
+            raise ValueError(f"max_length should be between 1 and 10, got {snake_length}")
+
+        snake.reverse()
+
+        state[snake[-1]] = 3
+        for i in snake[:-1]:
+            state[i] = 2
+
+        state_lag[snake[-2]] = 3
+        for i in snake[:-2]:
+            state_lag[i] = 2
+
+        # Place food in a random location not occupied by the snake
+        done = False
+        while not done:
+            proposal_food_loc = np.random.choice(100)
+            if proposal_food_loc not in snake:
+                done = True
+                state[proposal_food_loc] = 1
+                state_lag[proposal_food_loc] = 1
+
+        return state, state_lag, snake
+
+

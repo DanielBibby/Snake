@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 from matplotlib.colors import ListedColormap
 
 
-def visualize_game_state(state):
+def visualise_game_state(state):
     if len(state) != 100:
         raise ValueError("State list must have a length of 100.")
 
