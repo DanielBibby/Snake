@@ -1,22 +1,25 @@
 import matplotlib.pyplot as plt
+import numpy as np
 
 
-def get_performance(model, env, n_episodes=100, deterministic=True):
-    # Simulate 100 steps in the environment with rendering
+def get_performance(model, env, n_episodes=100, seed=None):
+    np.random.seed(seed)
+
+    # Simulat e 100 steps in the environment with rendering
     scores = []
 
     obs, _ = env.reset()  # Reset the environment and get the initial observation
     for i in range(n_episodes):
-        done = False
-        while not done:
+        episode_done = False
+        while not episode_done:
             # Use the model to predict the next action
-            action, _states = model.predict(obs, deterministic=deterministic)
+            action, _states = model.predict(obs, deterministic=True)
             # Take the action in the environment
             obs, reward, done, truncated, info = env.step(action)
 
             if done or truncated:
                 scores.append(info["score"])
-                done = True
+                episode_done = True
                 obs, _ = env.reset()
 
     return scores

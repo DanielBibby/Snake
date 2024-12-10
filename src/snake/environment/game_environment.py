@@ -6,6 +6,12 @@ import matplotlib.pyplot as plt
 from matplotlib.colors import ListedColormap
 from IPython.display import display, clear_output
 
+from .utils import transform_state, proximity_reward
+from .reset_utils import (
+    create_random_coil_state,
+    create_random_line_state,
+)
+
 
 class BaseSnakeEnv(gym.Env):
     def __init__(self):
@@ -92,7 +98,7 @@ class BaseSnakeEnv(gym.Env):
             # Update the display in the notebook
             clear_output(wait=True)  # Clear previous output to keep it dynamic
             display(self.fig)  # Display the current figure in the notebook
-            #plt.pause(0.01)  # Adjust for visualisation speed
+            # plt.pause(0.01)  # Adjust for visualisation speed
 
     def visualise_game_state(self, state):
         if len(state) != 100:
@@ -134,9 +140,6 @@ class BaseSnakeEnv(gym.Env):
         self.fig.canvas.draw()  # Explicitly draw the canvas to update the plot
 
     def close(self):
-        """
-        Any cleanup code for the environment can be added here (e.g., closing windows).
-        """
         pass
 
     def _update_state(
@@ -220,9 +223,9 @@ class BaseSnakeEnv(gym.Env):
         return False
 
 
-class SnakeEnvNewStateRep(BaseSnakeEnv):
+class SnakeEnvRotatedState(BaseSnakeEnv):
     def __init__(self):
-        super(SnakeEnvNewStateRep, self).__init__()
+        super(SnakeEnvRotatedState, self).__init__()
 
     def step(self, action):
         """
@@ -233,37 +236,15 @@ class SnakeEnvNewStateRep(BaseSnakeEnv):
         """
         self.state, reward, self.done, truncated, info = super().step(action)
 
-        # perform transformation on the state
-        rotated_state = self._transform_state(self.state)
+        # rotate snake so it is moving upwards
+        rotated_state = transform_state(state=self.state, snake=self._snake)
 
         return rotated_state, reward, self.done, truncated, info
 
-    def _transform_state(self, state):
-        """
-        Turn the game state into a matrix and rotate it so the snake is always facing up then return it back to a list.
 
-        :param state:
-        :return:
-        """
-
-        matrix = np.array(state).reshape(10, 10)
-
-        if self._snake[-1] - self._snake[-2] == 1:
-            # snake going right
-            return list(np.rot90(matrix, 1).flatten())
-        elif self._snake[-1] - self._snake[-2] == 10:
-            # snake going down
-            return list(np.rot90(matrix, 2).flatten())
-        elif self._snake[-1] - self._snake[-2] == -1:
-            # snake going left
-            return np.rot90(matrix, 3).flatten()
-        elif self._snake[-1] - self._snake[-2] == -10:
-            return list(matrix.flatten())
-
-
-class SnakeEnvNewReward(BaseSnakeEnv):
+class SnakeEnvProximityReward(BaseSnakeEnv):
     def __init__(self):
-        super(SnakeEnvNewReward, self).__init__()
+        super(SnakeEnvProximityReward, self).__init__()
 
     def step(self, action):
         """
@@ -277,50 +258,26 @@ class SnakeEnvNewReward(BaseSnakeEnv):
         if self.done:
             pass
         if reward == 0:
+            # if agents moves towards / away from food it gets a reward of +/- 0.2
             head = self._snake[-1]
-            old_head = self._state_lag.iloc[3]
-            head_change = head - old_head
+            old_head = self._snake[-2]
             food_loc = self.state.iloc[1]
-
-            # if head moves towards food give a reward of 0.2
-            if head_change == 10:
-                if food_loc < head:
-                    reward = 0.2
-                else:
-                    reward = -0.2
-            elif head_change == 1:
-                if food_loc % 10 > head % 10:
-                    reward = 0.2
-                else:
-                    reward = -0.2
-            elif head_change == -1:
-                if food_loc % 10 < head % 10:
-                    reward = 0.2
-                else:
-                    reward = -0.2
-            elif head_change == 10:
-                if food_loc > head:
-                    reward = 0.2
-                else:
-                    reward = -0.2
-            else:
-                raise Exception("Something has gone wrong with head locations")
+            reward = proximity_reward(head=head, old_head=old_head, food_loc=food_loc)
 
         return self.state, reward, self.done, truncated, info
 
 
 class SnakeEnvRandS(BaseSnakeEnv):
+    """
+    Environment with proximity based reward function and rotational mapping of the state space.
+
+    This environment will be the parent of many that will follow.
+    """
+
     def __init__(self):
         super(SnakeEnvRandS, self).__init__()
 
     def step(self, action):
-        """
-        This method applies an action and returns the next state, reward, done, and any additional info.
-
-        :param action: Action taken by the agent
-        :return: tuple (next_state, reward, done, info)
-        """
-
         self.state, reward, self.done, truncated, info = super().step(action)
 
         if self.done:
@@ -329,41 +286,40 @@ class SnakeEnvRandS(BaseSnakeEnv):
             new_reward = 0
         elif reward == 1:
             new_reward = 1
-
         elif reward == 0:
             head = self.state.index(3)
             old_head = self._state_lag.index(3)
             food_loc = self._state_lag.index(1)
 
-            head_food_dist = self._get_distance(head, food_loc)
-            old_head_food_dist = self._get_distance(old_head, food_loc)
+            new_reward = proximity_reward(
+                head=head, old_head=old_head, food_loc=food_loc
+            )
 
-            if head_food_dist < old_head_food_dist:
-                new_reward = 0.2
-            elif head_food_dist > old_head_food_dist:
-                new_reward = -0.2
-            else:
-                new_reward = 0
-                print(head_food_dist)
-                print(old_head_food_dist)
-                print("====")
-                print(head)
-                print(old_head)
-                print(food_loc)
-                raise Exception("Something has gone wrong.")
-
-        rotated_state = self._transform_state(self.state)
+        rotated_state = transform_state(state=self.state, snake=self._snake)
 
         return rotated_state, new_reward, self.done, truncated, info
 
+
+class SnakeEnvCoilReset(SnakeEnvRandS):
+    """
+    Environment with proximity reward and rotational mapping of state.
+    Also, the reset method will now return a snake that has a random length and position.
+
+    Overview of create_random_coil_state:
+        snake_length between 2-10 is chosen uniformly at random and a random position on the board is chosen
+        to be the starting point then a random walk occurs to create the body of the snake until snake_length
+        is reached or there are no valid moves. The head is assigned to be the starting point, not the end point.
+
+    See details of create_random_coil_state to see implementation.
+    """
+
+    def __init__(self):
+        super(SnakeEnvCoilReset, self).__init__()
+
     def reset(self, seed=None):
-        """
-        This method resets the environment to its initial state.
-        :return: Initial state
-        """
         super().reset(seed=seed)
 
-        self.state, self._state_lag, self._snake = self._create_random_state()
+        self.state, self._state_lag, self._snake = create_random_coil_state(max_len=10)
         self.done = False
 
         # set the hidden variables appropriately
@@ -372,161 +328,32 @@ class SnakeEnvRandS(BaseSnakeEnv):
 
         return self.state, {}
 
-    def _get_distance(self, pos1, pos2):
-        x_diff = abs(pos2 % 10 - pos1 % 10)
-        y_diff = abs(np.floor(pos2 / 10) - np.floor(pos1 / 10))
 
-        return x_diff + y_diff
+class SnakeEnvLineReset(SnakeEnvRandS):
+    """
+    Environment with proximity reward and rotational mapping of state.
+    Also, the reset method will now return a straight line snake with random length and position.
 
-    def _transform_state(self, state):
-        """
-        Turn the game state into a matrix and rotate it so the snake is always facing up then return it back to a list.
+    Overview of create_random_line_state:
+        snake_length between 2 - 10 is chosen unifromly at random. A straight line is drawn on the board of that length
+        with a random orientation. The snake head is placed at the end of this line.
 
-        :param state:
-        :return:
-        """
+    See details of create_random_line_state to see implementation.
+    """
 
-        matrix = np.array(state).reshape(10, 10)
-
-        if self._snake[-1] - self._snake[-2] == 1:
-            # snake going right
-            return list(np.rot90(matrix, 1).flatten())
-        elif self._snake[-1] - self._snake[-2] == 10:
-            # snake going down
-            return list(np.rot90(matrix, 2).flatten())
-        elif self._snake[-1] - self._snake[-2] == -1:
-            # snake going left
-            return np.rot90(matrix, 3).flatten()
-        elif self._snake[-1] - self._snake[-2] == -10:
-            return list(matrix.flatten())
-
-    def _get_valid_moves(self, x: int):
-        if x < 0 or x > 99:
-            raise Exception(f"x should be from 0 to 99, got {x}")
-
-        if x == 0:
-            return [1, 10]
-        elif x == 9:
-            return [-1, 10]
-        elif x == 90:
-            return [1, -10]
-        elif x == 99:
-            return [-1, -10]
-        elif x // 10 == 0:  # Top row
-            return [-1, 1, 10]
-        elif x // 10 == 9:  # Bottom row
-            return [-1, 1, -10]
-        elif x % 10 == 0:  # Left column
-            return [1, 10, -10]
-        elif x % 10 == 9:  # Right column
-            return [-1, 10, -10]
-        else:
-            return [-1, 1, 10, -10]
-
-    def _create_random_state(self, max_len: int = 10):
-        state = [0] * 100
-        state_lag = [0] * 100
-
-        # Initialize the snake with a random starting position
-        snake = [np.random.choice(100)]
-
-        # Generate a random tail length (minimum 2, maximum 9)
-        tail_length = np.random.choice(max_len - 2) + 2
-
-        # Build the snake
-        for _ in range(tail_length):
-            done = False
-            end = snake[-1]
-            valid_moves = self._get_valid_moves(end)
-            while not done:
-                try:
-                    proposal_move = np.random.choice(len(valid_moves))
-                    proposal_loc = end + valid_moves[proposal_move]
-
-                    if proposal_loc not in snake:
-                        snake.append(proposal_loc)
-                        done = True
-                    else:
-                        valid_moves.pop(proposal_move)
-                except ValueError:
-                    done = True
-
-        snake.reverse()
-        # Update state and state_lag with snake positions
-        for pos in snake[:-1]:
-            state[pos] = 2
-        state[snake[-1]] = 3
-
-        for pos in snake[:-2]:
-            state_lag[pos] = 2
-        state_lag[snake[-2]] = 3
-
-        # Place food in a random location not occupied by the snake
-        done = False
-        while not done:
-            proposal_food_loc = np.random.choice(100)
-            if proposal_food_loc not in snake:
-                done = True
-                state[proposal_food_loc] = 1
-                state_lag[proposal_food_loc] = 1
-
-        return state, state_lag, snake
-
-
-class SnakeEnvLineInit(SnakeEnvRandS):
     def __init__(self):
-        super(SnakeEnvRandS, self).__init__()
+        super(SnakeEnvLineReset, self).__init__()
 
-    def _create_random_state(self, max_len: int = 10):
-        state = [0] * 100
-        state_lag = [0] * 100
+    def reset(self, seed=None):
+        super().reset(
+            seed=seed
+        )  # TODO: improve this for readability so that gym.Env.reset(seed=None) is called instead.
 
-        snake_length = np.random.choice(max_len - 1) + 2
+        self.state, self._state_lag, self._snake = create_random_line_state(max_len=10)
+        self.done = False
 
-        if (snake_length >= 1) & (snake_length <= 10):
-            d = np.random.choice(4)  # 0: down, 1: up, 2: right, 3: left
+        # set the hidden variables appropriately
+        self._time_since_food_eaten = 0
+        self.score = 0
 
-            done = False
-            while not done:
-                proposal = np.random.choice(100)
-
-                if (d == 0) & (np.floor(proposal / 10) <= 10 - snake_length):
-                    snake = [proposal + 10 * i for i in range(snake_length)]
-                    done = True
-
-                elif (d == 1) & (np.floor(proposal / 10) >= snake_length - 1):
-                    snake = [proposal - 10 * i for i in range(snake_length)]
-                    done = True
-
-                elif (d == 2) & (proposal % 10 <= 10 - snake_length):
-                    snake = [proposal + i for i in range(snake_length)]
-                    done = True
-
-                elif (d == 3) & (proposal % 10 >= snake_length - 1):
-                    snake = [proposal - i for i in range(snake_length)]
-                    done = True
-        else:
-            raise ValueError(f"max_length should be between 1 and 10, got {snake_length}")
-
-        snake.reverse()
-
-        state[snake[-1]] = 3
-        for i in snake[:-1]:
-            state[i] = 2
-
-        state_lag[snake[-2]] = 3
-        for i in snake[:-2]:
-            state_lag[i] = 2
-
-        # Place food in a random location not occupied by the snake
-        done = False
-        while not done:
-            proposal_food_loc = np.random.choice(100)
-            if proposal_food_loc not in snake:
-                done = True
-                state[proposal_food_loc] = 1
-                state_lag[proposal_food_loc] = 1
-
-        return state, state_lag, snake
-
-
+        return self.state, {}
