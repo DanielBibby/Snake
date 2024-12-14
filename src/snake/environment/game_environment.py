@@ -241,6 +241,13 @@ class SnakeEnvRotatedState(BaseSnakeEnv):
 
         return rotated_state, reward, self.done, truncated, info
 
+    def reset(self, seed=None):
+        state, info = super().reset()
+
+        rotated_state = transform_state(state, self._snake)
+
+        return rotated_state, info
+
 
 class SnakeEnvProximityReward(BaseSnakeEnv):
     def __init__(self):
@@ -299,6 +306,13 @@ class SnakeEnvRandS(BaseSnakeEnv):
 
         return rotated_state, new_reward, self.done, truncated, info
 
+    def reset(self, seed=None):
+        state, info = super().reset()
+
+        rotated_state = transform_state(state, self._snake)
+
+        return rotated_state, info
+
 
 class SnakeEnvCoilReset(SnakeEnvRandS):
     """
@@ -317,7 +331,7 @@ class SnakeEnvCoilReset(SnakeEnvRandS):
         super(SnakeEnvCoilReset, self).__init__()
 
     def reset(self, seed=None):
-        super().reset(seed=seed)
+        super().reset(seed=seed)  # this is needed to run gym.Env.reset
 
         self.state, self._state_lag, self._snake = create_random_coil_state(max_len=10)
         self.done = False
@@ -326,7 +340,9 @@ class SnakeEnvCoilReset(SnakeEnvRandS):
         self._time_since_food_eaten = 0
         self.score = 0
 
-        return self.state, {}
+        rotated_state = transform_state(self.state, self._snake)
+
+        return rotated_state, {}
 
 
 class SnakeEnvLineReset(SnakeEnvRandS):
@@ -356,4 +372,6 @@ class SnakeEnvLineReset(SnakeEnvRandS):
         self._time_since_food_eaten = 0
         self.score = 0
 
-        return self.state, {}
+        rotated_snake = transform_state(self.state, self._snake)
+
+        return rotated_snake, {}

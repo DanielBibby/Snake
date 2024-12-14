@@ -47,7 +47,7 @@ def create_random_coil_state(self, max_len: int = 10):
     snake = [np.random.choice(100)]
 
     # Generate a random tail length (minimum 2, maximum 9)
-    tail_length = np.random.choice(max_len - 2) + 2
+    tail_length = np.random.choice(max_len - 2) + 3
 
     # Build the snake
     for _ in range(tail_length):
@@ -89,7 +89,7 @@ def create_random_line_state(max_len: int = 10):
     state = [0] * 100
     state_lag = [0] * 100
 
-    snake_length = np.random.choice(max_len - 1) + 2
+    snake_length = np.random.choice(max_len - 2) + 3
 
     if (snake_length >= 1) & (snake_length <= 10):
         d = np.random.choice(4)  # 0: down, 1: up, 2: right, 3: left
