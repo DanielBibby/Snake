@@ -1,5 +1,6 @@
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
 
 
 def get_performance(model, env, n_episodes=100, seed=None):
@@ -27,16 +28,18 @@ def get_performance(model, env, n_episodes=100, seed=None):
 
 def produce_plots(metrics):
     # Extract metrics
-    avg_rewards = [m["avg_score"] for m in metrics]
-    avg_lengths = [m["avg_length"] for m in metrics]
-    high_scores = [m["all_time_high_score"] for m in metrics]
+    # avg_rewards = [m["avg_score"] for m in metrics]
+    # avg_lengths = [m["avg_length"] for m in metrics]
+    # high_scores = [m["all_time_high_score"] for m in metrics]
+
+    df = pd.DataFrame(metrics)
 
     # Create plots
     plt.figure(figsize=(16, 6))
 
     # Average Reward Plot
     plt.subplot(1, 3, 1)
-    plt.plot(avg_rewards, label="Average Reward")
+    plt.plot(df.num_timesteps, df.avg_score, label="Average Score")
     plt.xlabel("Training Steps")
     plt.ylabel("Reward")
     plt.title("Average Reward Over Time")
@@ -44,7 +47,9 @@ def produce_plots(metrics):
 
     # Average Game Length Plot
     plt.subplot(1, 3, 2)
-    plt.plot(avg_lengths, label="Average Game Length", color="orange")
+    plt.plot(
+        df.num_timesteps, df.avg_length, label="Average Game Length", color="orange"
+    )
     plt.xlabel("Training Steps")
     plt.ylabel("Game Length")
     plt.title("Average Game Length Over Time")
@@ -52,7 +57,12 @@ def produce_plots(metrics):
 
     # All-Time High Score Plot
     plt.subplot(1, 3, 3)
-    plt.plot(high_scores, label="All-Time High Score", color="green")
+    plt.plot(
+        df.num_timesteps,
+        df.all_time_high_score,
+        label="All-Time High Score",
+        color="green",
+    )
     plt.xlabel("Training Steps")
     plt.ylabel("High Score")
     plt.title("All-Time High Score Over Time")
