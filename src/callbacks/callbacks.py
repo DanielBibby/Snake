@@ -28,13 +28,25 @@ class ScoreLoggerCallback(BaseCallback):
             # Compute metrics
             avg_score = np.mean(self.episode_scores[-100:])  # Last 100 episodes
             avg_length = np.mean(self.episode_lengths[-100:])
-            self.metrics.append(
-                {
-                    "avg_score": avg_score,
-                    "avg_length": avg_length,
-                    "all_time_high_score": self.all_time_high_score,
-                }
-            )
+            if len(self.episode_lengths) < 2:
+                self.metrics.append(
+                    {
+                        "avg_score": avg_score,
+                        "avg_length": avg_length,
+                        "all_time_high_score": self.all_time_high_score,
+                        "num_timesteps": episode_length,
+                    }
+                )
+            else:
+                self.metrics.append(
+                    {
+                        "avg_score": avg_score,
+                        "avg_length": avg_length,
+                        "all_time_high_score": self.all_time_high_score,
+                        "num_timesteps": episode_length
+                        + self.metrics[-1]["num_timesteps"],
+                    }
+                )
 
         return True
 
