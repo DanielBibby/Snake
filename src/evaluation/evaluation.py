@@ -27,10 +27,10 @@ def get_performance(model, env, n_episodes=100, seed=None):
 
 
 def produce_plots(metrics):
-    # Extract metrics
-    # avg_rewards = [m["avg_score"] for m in metrics]
-    # avg_lengths = [m["avg_length"] for m in metrics]
-    # high_scores = [m["all_time_high_score"] for m in metrics]
+    """
+    Produce plots of average episode length, average reward and high score during training.
+    """
+
 
     df = pd.DataFrame(metrics)
 
@@ -41,14 +41,14 @@ def produce_plots(metrics):
     plt.subplot(1, 3, 1)
     plt.plot(df.num_timesteps, df.avg_score, label="Average Score")
     plt.xlabel("Training Steps")
-    plt.ylabel("Reward")
-    plt.title("Average Reward Over Time")
+    plt.ylabel("Score")
+    plt.title("Average Score Through Training")
     plt.legend()
 
     # Average Game Length Plot
     plt.subplot(1, 3, 2)
     plt.plot(
-        df.num_timesteps, df.avg_length, label="Average Game Length", color="orange"
+        df.num_timesteps, df.avg_length, label="Average Game Length During Training", color="orange"
     )
     plt.xlabel("Training Steps")
     plt.ylabel("Game Length")
@@ -60,14 +60,42 @@ def produce_plots(metrics):
     plt.plot(
         df.num_timesteps,
         df.all_time_high_score,
-        label="All-Time High Score",
+        label="High Score",
         color="green",
     )
     plt.xlabel("Training Steps")
     plt.ylabel("High Score")
-    plt.title("All-Time High Score Over Time")
+    plt.title("All-Time High Score During Training")
     plt.legend()
 
     # Adjust layout and display the plots
     plt.tight_layout()
     plt.show()
+
+
+def watch_agent_play(model, env, num_timesteps=150):
+    """
+    Renders the given model interacting with the given environment for the total number of provided timesteps.
+
+    :param model: policy be observed
+    :param env: environment agent is interacting with. Using an incompatible env will lead to issues
+    :param num_timesteps: number of steps to be observed
+    :return: rendering of agent making decisions
+    """
+    print("Interrupt kernel to stop rendering")
+
+    obs, _ = env.reset()  # Reset the environment and get the initial observation
+    for step in range(num_timesteps):
+        action, _states = model.predict(obs, deterministic=True)
+
+        obs, reward, done, truncated, info = env.step(action)
+        if env._time_since_food_eaten > 15 * len(env._snake):
+            # stop watching if agent is going in circles
+            truncated = True
+
+        if done or truncated:
+            obs, _ = env.reset()
+
+        # Render the environment
+        env.render()
+

@@ -4,7 +4,7 @@
 import numpy as np
 
 
-def get_valid_moves(self, x: int):
+def get_valid_moves(x: int):
     if x < 0 or x > 99:
         raise Exception(f"x should be from 0 to 99, got {x}")
 
@@ -39,7 +39,7 @@ def generate_food_loc(snake):
     return proposal_food_loc
 
 
-def create_random_coil_state(self, max_len: int = 10):
+def create_random_coil_state(max_len: int = 10):
     state = [0] * 100
     state_lag = [0] * 100
 
@@ -53,7 +53,7 @@ def create_random_coil_state(self, max_len: int = 10):
     for _ in range(tail_length):
         done = False
         end = snake[-1]
-        valid_moves = self._get_valid_moves(end)
+        valid_moves = get_valid_moves(end)
         while not done:
             try:
                 proposal_move = np.random.choice(len(valid_moves))
