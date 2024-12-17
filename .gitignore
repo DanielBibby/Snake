@@ -1,7 +1,7 @@
 .idea/
-data/*
 notebooks/.ipynb_checkpoints/*
 venv/
 __pycache__/
 *.log
 *.ipynb_checkpoints/
+notebooks/notebooks_ignore

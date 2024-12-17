@@ -357,15 +357,17 @@ class SnakeEnvLineReset(SnakeEnvRandS):
     See details of create_random_line_state to see implementation.
     """
 
-    def __init__(self):
+    def __init__(self, max_reset_length: int = 10):
         super(SnakeEnvLineReset, self).__init__()
+
+        self.max_reset_length = max_reset_length
 
     def reset(self, seed=None):
         super().reset(
             seed=seed
         )  # TODO: improve this for readability so that gym.Env.reset(seed=None) is called instead.
 
-        self.state, self._state_lag, self._snake = create_random_line_state(max_len=10)
+        self.state, self._state_lag, self._snake = create_random_line_state(max_len=self.max_reset_length)
         self.done = False
 
         # set the hidden variables appropriately
