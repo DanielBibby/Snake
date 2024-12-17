@@ -4,4 +4,5 @@ venv/
 __pycache__/
 *.log
 *.ipynb_checkpoints/
-notebooks/notebooks_ignore
+notebooks/notebooks_ignore/*
+

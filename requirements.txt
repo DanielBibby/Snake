@@ -1,5 +1,0 @@
-pandas
-numpy
-scikit-learn
-matplotlib
-gym==0.26.2
