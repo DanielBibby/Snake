@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 from matplotlib.colors import ListedColormap
 from IPython.display import display, clear_output
 
-from .utils import transform_state, proximity_reward
+from .utils import rotate_state, proximity_reward, flip_state
 from .reset_utils import (
     create_random_coil_state,
     create_random_line_state,
@@ -237,16 +237,18 @@ class SnakeEnvRotatedState(BaseSnakeEnv):
         self.state, reward, self.done, truncated, info = super().step(action)
 
         # rotate snake so it is moving upwards
-        rotated_state = transform_state(state=self.state, snake=self._snake)
+        rotated_state = rotate_state(state=self.state, snake=self._snake)
+        flipped_state = flip_state(state=rotated_state)
 
-        return rotated_state, reward, self.done, truncated, info
+        return flipped_state, reward, self.done, truncated, info
 
     def reset(self, seed=None):
         state, info = super().reset()
 
-        rotated_state = transform_state(state, self._snake)
+        rotated_state = rotate_state(state, self._snake)
+        flipped_state = flip_state(state=rotated_state)
 
-        return rotated_state, info
+        return flipped_state, info
 
 
 class SnakeEnvProximityReward(BaseSnakeEnv):
@@ -302,16 +304,18 @@ class SnakeEnvRandS(BaseSnakeEnv):
                 head=head, old_head=old_head, food_loc=food_loc
             )
 
-        rotated_state = transform_state(state=self.state, snake=self._snake)
+        rotated_state = rotate_state(state=self.state, snake=self._snake)
+        flipped_state = flip_state(state=rotated_state)
 
-        return rotated_state, new_reward, self.done, truncated, info
+        return flipped_state, new_reward, self.done, truncated, info
 
     def reset(self, seed=None):
         state, info = super().reset()
 
-        rotated_state = transform_state(state, self._snake)
+        rotated_state = rotate_state(state=self.state, snake=self._snake)
+        flipped_state = flip_state(state=rotated_state)
 
-        return rotated_state, info
+        return flipped_state, info
 
 
 class SnakeEnvCoilReset(SnakeEnvRandS):
@@ -327,22 +331,26 @@ class SnakeEnvCoilReset(SnakeEnvRandS):
     See details of create_random_coil_state to see implementation.
     """
 
-    def __init__(self):
+    def __init__(self, max_reset_length: int = 10):
         super(SnakeEnvCoilReset, self).__init__()
+        self.max_reset_length = max_reset_length
 
     def reset(self, seed=None):
         super().reset(seed=seed)  # this is needed to run gym.Env.reset
 
-        self.state, self._state_lag, self._snake = create_random_coil_state(max_len=10)
+        self.state, self._state_lag, self._snake = create_random_coil_state(
+            max_len=self.max_reset_length
+        )
         self.done = False
 
         # set the hidden variables appropriately
         self._time_since_food_eaten = 0
         self.score = 0
 
-        rotated_state = transform_state(self.state, self._snake)
+        rotated_state = rotate_state(state=self.state, snake=self._snake)
+        flipped_state = flip_state(state=rotated_state)
 
-        return rotated_state, {}
+        return flipped_state, {}
 
 
 class SnakeEnvLineReset(SnakeEnvRandS):
@@ -367,13 +375,16 @@ class SnakeEnvLineReset(SnakeEnvRandS):
             seed=seed
         )  # TODO: improve this for readability so that gym.Env.reset(seed=None) is called instead.
 
-        self.state, self._state_lag, self._snake = create_random_line_state(max_len=self.max_reset_length)
+        self.state, self._state_lag, self._snake = create_random_line_state(
+            max_len=self.max_reset_length
+        )
         self.done = False
 
         # set the hidden variables appropriately
         self._time_since_food_eaten = 0
         self.score = 0
 
-        rotated_snake = transform_state(self.state, self._snake)
+        rotated_state = rotate_state(state=self.state, snake=self._snake)
+        flipped_state = flip_state(state=rotated_state)
 
-        return rotated_snake, {}
+        return flipped_state, {}

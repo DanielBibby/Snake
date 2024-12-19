@@ -31,7 +31,6 @@ def produce_plots(metrics):
     Produce plots of average episode length, average reward and high score during training.
     """
 
-
     df = pd.DataFrame(metrics)
 
     # Create plots
@@ -48,7 +47,10 @@ def produce_plots(metrics):
     # Average Game Length Plot
     plt.subplot(1, 3, 2)
     plt.plot(
-        df.num_timesteps, df.avg_length, label="Average Game Length During Training", color="orange"
+        df.num_timesteps,
+        df.avg_length,
+        label="Average Game Length During Training",
+        color="orange",
     )
     plt.xlabel("Training Steps")
     plt.ylabel("Game Length")
@@ -98,4 +100,3 @@ def watch_agent_play(model, env, num_timesteps=150):
 
         # Render the environment
         env.render()
-
