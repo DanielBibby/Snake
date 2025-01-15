@@ -5,4 +5,4 @@ __pycache__/
 *.log
 *.ipynb_checkpoints/
 notebooks/notebooks_ignore/*
-
+src/.DS_Store

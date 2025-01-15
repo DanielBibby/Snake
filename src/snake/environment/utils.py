@@ -59,10 +59,10 @@ def flip_state(state):
         new_state[new_snake_head] = 3
         new_state[new_food_loc] = 1
 
-        return new_state
+        return new_state, True
 
     else:
-        return state
+        return state, False
 
 
 def proximity_reward(head, old_head, food_loc):

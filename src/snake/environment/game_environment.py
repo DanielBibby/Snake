@@ -1,244 +1,45 @@
-import gymnasium as gym
-from gymnasium.spaces.discrete import Discrete
-from gymnasium.spaces import MultiDiscrete
 import numpy as np
-import matplotlib.pyplot as plt
-from matplotlib.colors import ListedColormap
-from IPython.display import display, clear_output
-
 from .utils import rotate_state, proximity_reward, flip_state
 from .reset_utils import (
     create_random_coil_state,
     create_random_line_state,
 )
+from .base_game_environment import BaseSnakeEnv
 
 
-class BaseSnakeEnv(gym.Env):
+
+class SnakeEnvTransformedState(BaseSnakeEnv):
+    """
+    This child of BaseSnakeEnv transformed the state representation so that, during training, the algorithm would
+    be shown states that are rotated and flipped so that
+        1. The snake is always moving up
+        2. The head is always on the right side of the grid.
+    This provides an eight-to-one mapping of the state space, leading to more efficient training.
+    """
+
+    _flip_occured: bool # indicates the state was mirrored, meaning left / right movements should also be mirrored.
+
     def __init__(self):
-        super(BaseSnakeEnv, self).__init__()
-
-        self.action_space = Discrete(3)  # {0: 'Left', 1: 'Straight', 2: 'Right'}
-
-        # [head loc x, head loc y, food loc x, food loc y, danger left, danger straight, danger right]
-        # for each grid loc there is either head, tail, food or nothing
-        self.observation_space = MultiDiscrete(
-            [4] * 10 * 10
-        )  # {0: 'Nothing', 1: 'food', 2: 'tail', 3: 'head'}
-
-        self.state = [0] * 10 * 10
-        self.state[40:43] = [2, 2, 3]
-        self.state[47] = 1
-        self.done = False
-
-        self._state_lag = None
-        self._snake = [40, 41, 42]
-        self._time_since_food_eaten = 0
-        self.score = 0
+        super(SnakeEnvTransformedState, self).__init__()
 
     def step(self, action):
-        """
-        This method applies an action and returns the next state, reward, done, and any additional info.
+        if self._flip_occured:
+            flipped_action = {
+                0: 2, # maps a left movement to a right movement
+                1: 1, # straight movements are unchanged
+                2: 0, # maps a right movement to a left movement
+            }
+            if isinstance(action, np.ndarray) and action.size == 1:
+                action = action.item()  # Extract the single element as an integer
 
-        :param action: Action taken by the agent
-        :return: tuple (next_state, reward, done, info)
-        """
-        self.done, self.state, food_eaten = self._update_state(action)
+            action = flipped_action[action]
 
-        # Give reward only if food is eaten
-        if food_eaten:
-            reward = 1
-            self._time_since_food_eaten = 0
-            self.score += 1
-        elif self.done:
-            reward = -1
-        else:
-            reward = 0
-            self._time_since_food_eaten += 1
-
-        truncated = False
-        if self._time_since_food_eaten > 25 * len(self._snake):
-            truncated = True
-
-        info = {"score": self.score}
-
-        return self.state, reward, self.done, truncated, info
-
-    def reset(self, seed=None):
-        """
-        This method resets the environment to its initial state.
-        :return: Initial state
-        """
-        super().reset(seed=seed)
-
-        self.state = [0] * 10 * 10
-        self.state[40:43] = [2, 2, 3]
-        self.state[47] = 1
-        self.done = False
-
-        # set the hidden variables appropriately
-        self._state_lag = None
-        self._snake = [40, 41, 42]
-        self._time_since_food_eaten = 0
-        self.score = 0
-
-        return self.state, {}
-
-    def render(self, mode="human"):
-        """
-        This method renders the environment with a progressive animation of the game.
-        """
-        # If a figure already exists, do not create a new one; just update the plot
-        if not hasattr(self, "fig"):
-            self.fig, self.ax = plt.subplots(figsize=(6, 6))
-
-        # Call the helper function to visualise the state
-        self.visualise_game_state(self.state)
-
-        if mode == "human":
-            # Update the display in the notebook
-            clear_output(wait=True)  # Clear previous output to keep it dynamic
-            display(self.fig)  # Display the current figure in the notebook
-            # plt.pause(0.01)  # Adjust for visualisation speed
-
-    def visualise_game_state(self, state):
-        if len(state) != 100:
-            raise ValueError("State list must have a length of 100.")
-
-        # Map the state list to a 10x10 grid
-        grid = np.array(state).reshape(10, 10)
-
-        # Define colors for each state
-        cmap = ListedColormap(
-            ["white", "green", "blue", "red"]
-        )  # Corresponds to 0, 1, 2, 3
-
-        # Plot the grid on the existing axes
-        self.ax.clear()  # Clear the previous plot to avoid overlaps
-        self.ax.imshow(grid, cmap=cmap, aspect="equal")
-
-        # Set up the gridlines and labels
-        self.ax.set_xticks(np.arange(-0.5, 10, 1), minor=True)
-        self.ax.set_yticks(np.arange(-0.5, 10, 1), minor=True)
-        self.ax.grid(which="minor", color="black", linestyle="-", linewidth=0.5)
-        self.ax.tick_params(
-            which="both", bottom=False, left=False, labelbottom=False, labelleft=False
-        )
-
-        # Annotate cells (optional, for debugging)
-        for i in range(10):
-            for j in range(10):
-                self.ax.text(
-                    j,
-                    i,
-                    int(grid[i, j]),
-                    color="black",
-                    ha="center",
-                    va="center",
-                    fontsize=10,
-                )
-
-        self.fig.canvas.draw()  # Explicitly draw the canvas to update the plot
-
-    def close(self):
-        pass
-
-    def _update_state(
-        self, action: Discrete(3)
-    ) -> (bool, MultiDiscrete([4] * 10 * 10), bool):
-        """
-        Sse self.state and self._state_lag to figure out the next state
-        """
-
-        head = self.state.index(3)
-        if self._state_lag:
-            head_lag = self._state_lag.index(3)
-        else:
-            head_lag = head - 1  # snake always start moving right
-        food_index = self.state.index(1)
-
-        head_change = head - head_lag
-        # head_change = +/- 1 => snake moving right / left
-        # head_change = +/- 10 => snake moving down / up
-
-        direction_action_tuple = (head_change, action)
-        head_lag = head
-        if direction_action_tuple in [(1, 2), (-1, 0), (10, 1)]:
-            # head moves down
-            head += 10
-        elif direction_action_tuple in [(-10, 2), (10, 0), (1, 1)]:
-            # head moves right
-            head += 1
-        elif direction_action_tuple in [(10, 2), (-10, 0), (-1, 1)]:
-            # head moves left
-            head -= 1
-        elif direction_action_tuple in [(-1, 2), (1, 0), (-10, 1)]:
-            # head moves up
-            head -= 10
-
-        # update the snake positions
-        self._snake.append(head)
-
-        food_eaten = False
-        if food_index == head:
-            food_eaten = True
-            food_index = self._generate_new_food()
-        else:
-            self._snake.pop(0)
-
-        if self._terminal_reached():
-            return True, self.state, False
-
-        # create new game state
-        new_state = [0] * 10 * 10
-        new_state[food_index] = 1
-        for i in self._snake[0:-1]:
-            new_state[i] = 2
-        new_state[head] = 3
-
-        self._state_lag = self.state
-
-        return False, new_state, food_eaten
-
-    def _generate_new_food(self):
-        valid_locations = [i for i in range(10 * 10) if i not in self._snake]
-
-        return np.random.choice(valid_locations)
-
-    def _terminal_reached(self) -> bool:
-        """
-        Method to figure out if an action results in a terminal action
-        """
-        if self._snake[-2] % 10 == 0 and self._snake[-2] - self._snake[-1] == 1:
-            # leftmost wall has been hit
-            return True
-        elif (self._snake[-2] + 1) % 10 == 0 and self._snake[-1] - self._snake[-2] == 1:
-            # rightmost wall has been hit
-            return True
-        elif self._snake[-1] < 0 or self._snake[-1] >= 100:
-            # either upper or lower most wall has been hit
-            return True
-        elif self._snake[-1] in self._snake[:-1]:
-            return True
-
-        return False
-
-
-class SnakeEnvRotatedState(BaseSnakeEnv):
-    def __init__(self):
-        super(SnakeEnvRotatedState, self).__init__()
-
-    def step(self, action):
-        """
-        This method applies an action and returns the next state, reward, done, and any additional info.
-
-        :param action: Action taken by the agent
-        :return: tuple (next_state, reward, done, info)
-        """
         self.state, reward, self.done, truncated, info = super().step(action)
 
         # rotate snake so it is moving upwards
         rotated_state = rotate_state(state=self.state, snake=self._snake)
-        flipped_state = flip_state(state=rotated_state)
+        # mirror state if the snake head is in the left half of the grid
+        flipped_state, self._flip_occured = flip_state(state=rotated_state)
 
         return flipped_state, reward, self.done, truncated, info
 
@@ -246,26 +47,26 @@ class SnakeEnvRotatedState(BaseSnakeEnv):
         state, info = super().reset()
 
         rotated_state = rotate_state(state, self._snake)
-        flipped_state = flip_state(state=rotated_state)
+        flipped_state, self._flip_occured = flip_state(state=rotated_state)
 
         return flipped_state, info
 
 
 class SnakeEnvProximityReward(BaseSnakeEnv):
+    """
+    This class introduces a small reward of +/- 0.2 for moving towards / away from food, making rewards less sparse
+    during training.
+    """
+
     def __init__(self):
         super(SnakeEnvProximityReward, self).__init__()
 
     def step(self, action):
-        """
-        This method applies an action and returns the next state, reward, done, and any additional info.
-
-        :param action: Action taken by the agent
-        :return: tuple (next_state, reward, done, info)
-        """
         self.state, reward, self.done, truncated, info = super().step(action)
 
         if self.done:
             pass
+        # new reward logic
         if reward == 0:
             # if agents moves towards / away from food it gets a reward of +/- 0.2
             head = self._snake[-1]
@@ -276,17 +77,27 @@ class SnakeEnvProximityReward(BaseSnakeEnv):
         return self.state, reward, self.done, truncated, info
 
 
-class SnakeEnvRandS(BaseSnakeEnv):
+class SnakeEnvTranformedProximityReward(BaseSnakeEnv):
     """
-    Environment with proximity based reward function and rotational mapping of the state space.
-
-    This environment will be the parent of many that will follow.
+    This class implements the state transormation discussed in SnakeEnvTransformedState and the new reward
+    function discuessed in SnakeEnvProximityReward.
     """
 
     def __init__(self):
-        super(SnakeEnvRandS, self).__init__()
+        super(SnakeEnvTranformedProximityReward, self).__init__()
 
     def step(self, action):
+        if self._flip_occured:
+            flipped_action = {
+                0: 2,
+                1: 1,
+                2: 0,
+            }
+            if isinstance(action, np.ndarray) and action.size == 1:
+                action = action.item()  # Extract the single element as an integer
+
+            action = flipped_action[action]
+
         self.state, reward, self.done, truncated, info = super().step(action)
 
         if self.done:
@@ -305,7 +116,7 @@ class SnakeEnvRandS(BaseSnakeEnv):
             )
 
         rotated_state = rotate_state(state=self.state, snake=self._snake)
-        flipped_state = flip_state(state=rotated_state)
+        flipped_state, self._flip_occured = flip_state(state=rotated_state)
 
         return flipped_state, new_reward, self.done, truncated, info
 
@@ -313,22 +124,20 @@ class SnakeEnvRandS(BaseSnakeEnv):
         state, info = super().reset()
 
         rotated_state = rotate_state(state=self.state, snake=self._snake)
-        flipped_state = flip_state(state=rotated_state)
+        flipped_state, self._flip_occured = flip_state(state=rotated_state)
 
         return flipped_state, info
 
 
-class SnakeEnvCoilReset(SnakeEnvRandS):
+class SnakeEnvCoilReset(SnakeEnvTranformedProximityReward):
     """
-    Environment with proximity reward and rotational mapping of state.
-    Also, the reset method will now return a snake that has a random length and position.
+    Environment with new reward function and state transformation.
 
-    Overview of create_random_coil_state:
-        snake_length between 2-10 is chosen uniformly at random and a random position on the board is chosen
-        to be the starting point then a random walk occurs to create the body of the snake until snake_length
-        is reached or there are no valid moves. The head is assigned to be the starting point, not the end point.
+    reset method now resets to a random snake based on the following logic.
 
-    See details of create_random_coil_state to see implementation.
+    Snake head is randomly placed on grid and tail length is sampled randomly from [2,...,max_reset_length (default = 10)], working
+    backwards the tail is formed by a random walk until either there are no valid squares or the max tail length is
+    reached.
     """
 
     def __init__(self, max_reset_length: int = 10):
@@ -342,27 +151,24 @@ class SnakeEnvCoilReset(SnakeEnvRandS):
             max_len=self.max_reset_length
         )
         self.done = False
-
-        # set the hidden variables appropriately
-        self._time_since_food_eaten = 0
         self.score = 0
+        self._time_since_food_eaten = 0
 
         rotated_state = rotate_state(state=self.state, snake=self._snake)
-        flipped_state = flip_state(state=rotated_state)
+        flipped_state, self._flip_occured = flip_state(state=rotated_state)
 
         return flipped_state, {}
 
 
-class SnakeEnvLineReset(SnakeEnvRandS):
+class SnakeEnvLineReset(SnakeEnvTranformedProximityReward):
     """
-    Environment with proximity reward and rotational mapping of state.
-    Also, the reset method will now return a straight line snake with random length and position.
+    Environment with new reward function and state transformation.
 
-    Overview of create_random_line_state:
-        snake_length between 2 - 10 is chosen unifromly at random. A straight line is drawn on the board of that length
-        with a random orientation. The snake head is placed at the end of this line.
+    reset method now resets snake to a random position based on the following logic.
 
-    See details of create_random_line_state to see implementation.
+    Snake head is randomly placed on grid and a random direction is chosen tail length is sampled randomly from
+    [2, ..., min(max_reset_length (default = 10), distance to wall in chosen direction)] a straight tail is made of
+    the sampled length.
     """
 
     def __init__(self, max_reset_length: int = 10):
@@ -373,7 +179,7 @@ class SnakeEnvLineReset(SnakeEnvRandS):
     def reset(self, seed=None):
         super().reset(
             seed=seed
-        )  # TODO: improve this for readability so that gym.Env.reset(seed=None) is called instead.
+        )
 
         self.state, self._state_lag, self._snake = create_random_line_state(
             max_len=self.max_reset_length
@@ -385,6 +191,6 @@ class SnakeEnvLineReset(SnakeEnvRandS):
         self.score = 0
 
         rotated_state = rotate_state(state=self.state, snake=self._snake)
-        flipped_state = flip_state(state=rotated_state)
+        flipped_state, self._flip_occured = flip_state(state=rotated_state)
 
         return flipped_state, {}

@@ -23,7 +23,7 @@ class CustomFlattenExtractor(BaseFeaturesExtractor):
 
         NNs can handle linearity
         by shrinking weights of redundant features. But by engineering this I hope to improve training
-        efficiency.
+        efficiency by removing any training cost associated with learning this linearity.
         """
         batch_size = observations.shape[0]
         reshaped_observations = observations.reshape(batch_size, 100, 4)

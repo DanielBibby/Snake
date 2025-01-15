@@ -31,7 +31,7 @@ Ensure you have the following installed:
    ```
    poetry shell
 
-4. Install the vnenv as a Jupyter Kernel
+4. Install the venv as a Jupyter Kernel
    ```
    python -m ipykernel install --user --name=snake --display-name "Python (snake)"
 

@@ -3,27 +3,33 @@ import numpy as np
 import pandas as pd
 
 
-def get_performance(model, env, n_episodes=100, seed=None):
+def get_performance(model, env, n_episodes=100, seed=None, num_points=100000):
     np.random.seed(seed)
 
     # Simulat e 100 steps in the environment with rendering
     scores = []
+    game_lengths = []
 
     obs, _ = env.reset()  # Reset the environment and get the initial observation
+
     for i in range(n_episodes):
+
         episode_done = False
+        episode_length = 0
         while not episode_done:
             # Use the model to predict the next action
             action, _states = model.predict(obs, deterministic=True)
             # Take the action in the environment
             obs, reward, done, truncated, info = env.step(action)
+            episode_length += 1
 
             if done or truncated:
                 scores.append(info["score"])
+                game_lengths.append(episode_length)
                 episode_done = True
                 obs, _ = env.reset()
 
-    return scores
+    return scores, game_lengths
 
 
 def produce_plots(metrics):
