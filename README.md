@@ -13,7 +13,7 @@ train an agent to play snake.
 
 Ensure you have the following installed:
 
-- **Python** (>= 3.8)
+- **Python** (>= 3.9)
 - **Poetry** (for dependency management and virtual environment setup)
 
 ### Steps
